@@ -15,6 +15,7 @@ class WebsiteUpdate(BaseModel):
     opportunity_link: Optional[str] = None
     can_update_referral: Optional[bool] = None
     status: Optional[str] = None
+    customizations: Optional[Dict[str, str]] = None
 
 
 class WebsiteUserUpdate(BaseModel):
