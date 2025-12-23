@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     
     # Frontend
     frontend_url: str = "http://localhost:5173"
+    allowed_origins: str = "http://localhost:5173,http://localhost:3000,https://uigsc.vercel.app"
     
     # Environment
     environment: str = "development"
