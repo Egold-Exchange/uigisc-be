@@ -1,0 +1,141 @@
+from typing import List
+from fastapi import APIRouter, HTTPException
+
+from app.database import get_database
+from app.schemas.opportunity import OpportunityPublicResponse
+from app.schemas.website import WebsitePublicResponse
+from app.models.opportunity import opportunity_helper
+
+router = APIRouter()
+
+
+@router.get("/opportunities", response_model=List[OpportunityPublicResponse])
+async def get_public_opportunities():
+    """Get all active opportunities for the homepage."""
+    db = get_database()
+    
+    opportunities = []
+    cursor = db.opportunities.find({"status": "active"}).sort("order", 1)
+    
+    async for opp in cursor:
+        opp_id = str(opp["_id"])
+        
+        primary_button = opp.get("primary_button")
+        if not primary_button and opp.get("opportunity_link"):
+            primary_button = {"text": "Join Now", "link": opp.get("opportunity_link")}
+            
+        opportunities.append(OpportunityPublicResponse(
+            id=opp_id,
+            name=opp["name"],
+            image=opp.get("image", ""),
+            description=opp.get("description", ""),
+            videos=opp.get("videos", []),
+            telegram_link=opp.get("telegram_link"),
+            primary_button=primary_button,
+            secondary_button=opp.get("secondary_button"),
+            status=opp.get("status", "active"),
+            is_featured=opp.get("is_featured", False),
+            order=opp.get("order", 0)
+        ))
+    
+    return opportunities
+
+
+@router.get("/check-subdomain/{subdomain}")
+async def check_subdomain_availability(subdomain: str):
+    """Check if a subdomain is available."""
+    db = get_database()
+    
+    # Validate subdomain format
+    if len(subdomain) < 3 or len(subdomain) > 30:
+        return {"available": False, "message": "Subdomain must be 3-30 characters"}
+    
+    if not subdomain.isalnum():
+        return {"available": False, "message": "Subdomain can only contain letters and numbers"}
+    
+    # Reserved subdomains
+    reserved = ["admin", "api", "www", "mail", "ftp", "app", "dashboard", "login"]
+    if subdomain.lower() in reserved:
+        return {"available": False, "message": "This subdomain is reserved"}
+    
+    # Check database
+    existing = await db.users.find_one({"subdomain": subdomain.lower()})
+    if existing:
+        return {"available": False, "message": "Subdomain already taken"}
+    
+    return {"available": True, "message": "Subdomain is available"}
+    
+    
+@router.get("/site/{subdomain}", response_model=WebsitePublicResponse)
+async def get_user_site(subdomain: str):
+    """Get public data for a user site."""
+    db = get_database()
+    
+    site = await db.websites.find_one({
+        "subdomain": subdomain.lower(),
+        "status": "active"
+    })
+    
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    return WebsitePublicResponse(
+        subdomain=site["subdomain"],
+        opportunity_link=site.get("opportunity_link", ""),
+        customizations=site.get("customizations", {})
+    )
+
+
+@router.get("/site/{subdomain}/opportunities", response_model=List[OpportunityPublicResponse])
+async def get_site_opportunities(subdomain: str):
+    """Get opportunities for a specific user site with customizations applied."""
+    db = get_database()
+    
+    # Get site
+    site = await db.websites.find_one({
+        "subdomain": subdomain.lower(),
+        "status": "active"
+    })
+    
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    
+    customizations = site.get("customizations", {})
+    
+    # Get opportunities
+    opportunities = []
+    cursor = db.opportunities.find({"status": "active"}).sort("order", 1)
+    
+    async for opp in cursor:
+        opp_id = str(opp["_id"])
+        
+        # Apply customizations if any
+        primary_button = opp.get("primary_button")
+        
+        # Fallback to opportunity_link if primary_button is missing
+        if not primary_button and opp.get("opportunity_link"):
+            primary_button = {"text": "Join Now", "link": opp.get("opportunity_link")}
+        
+        if opp_id in customizations and customizations[opp_id]:
+            # Override primary button link with user's custom link
+            if primary_button:
+                primary_button = {**primary_button, "link": customizations[opp_id]}
+            else:
+                # If neither primary_button nor opportunity_link exist, but customization does
+                primary_button = {"text": "Join Now", "link": customizations[opp_id]}
+        
+        opportunities.append(OpportunityPublicResponse(
+            id=opp_id,
+            name=opp["name"],
+            image=opp.get("image", ""),
+            description=opp.get("description", ""),
+            videos=opp.get("videos", []),
+            telegram_link=opp.get("telegram_link"),
+            primary_button=primary_button,
+            secondary_button=opp.get("secondary_button"),
+            status=opp.get("status", "active"),
+            is_featured=opp.get("is_featured", False),
+            order=opp.get("order", 0)
+        ))
+    
+    return opportunities
