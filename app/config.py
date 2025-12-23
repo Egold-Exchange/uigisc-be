@@ -29,6 +29,28 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
     
+    # DigitalOcean Spaces
+    dospace_secret: str = ""
+    dospace_access_key: str = ""
+    dospace_endpoint: str = ""
+    dospace_bucket_name: str = ""
+
+    @property
+    def do_secret(self) -> str:
+        return self.dospace_secret
+    
+    @property
+    def do_access_key(self) -> str:
+        return self.dospace_access_key
+    
+    @property
+    def do_endpoint(self) -> str:
+        return self.dospace_endpoint
+    
+    @property
+    def do_bucket(self) -> str:
+        return self.dospace_bucket_name
+    
     @property
     def admin_email_list(self) -> List[str]:
         return [email.strip() for email in self.admin_emails.split(",")]

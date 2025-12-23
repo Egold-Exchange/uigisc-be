@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, File, UploadFile
 from bson import ObjectId
 
 from app.database import get_database
@@ -12,8 +12,38 @@ from app.middleware.auth import get_admin_user
 from app.schemas.user import TokenData
 from app.models.opportunity import opportunity_helper
 from app.models.website import website_helper
+from app.services.storage import storage_service
 
 router = APIRouter()
+
+
+# ==================== UTILS/STORAGE ====================
+
+@router.post("/upload")
+async def upload_image(
+    file: UploadFile = File(...),
+    current_user: TokenData = Depends(get_admin_user)
+):
+    """Upload an image to DigitalOcean Spaces (admin only)."""
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image"
+        )
+    
+    try:
+        content = await file.read()
+        url = await storage_service.upload_file(
+            content, 
+            file.filename, 
+            file.content_type
+        )
+        return {"url": url}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 # ==================== OPPORTUNITIES ====================
