@@ -27,8 +27,6 @@ async def get_public_opportunities():
         opp_id = str(opp["_id"])
         
         primary_button = opp.get("primary_button")
-        if not primary_button and opp.get("opportunity_link"):
-            primary_button = {"text": "Join Now", "link": opp.get("opportunity_link")}
             
         opportunities.append(OpportunityPublicResponse(
             id=opp_id,
@@ -36,6 +34,7 @@ async def get_public_opportunities():
             image=opp.get("image", ""),
             description=opp.get("description", ""),
             videos=opp.get("videos", []),
+            bottom_description=opp.get("bottom_description", ""),
             telegram_link=opp.get("telegram_link"),
             primary_button=primary_button,
             secondary_button=opp.get("secondary_button"),
@@ -87,7 +86,6 @@ async def get_user_site(subdomain: str):
     
     return WebsitePublicResponse(
         subdomain=site["subdomain"],
-        opportunity_link=site.get("opportunity_link", ""),
         customizations=site.get("customizations", {})
     )
 
@@ -118,16 +116,12 @@ async def get_site_opportunities(subdomain: str):
         # Apply customizations if any
         primary_button = opp.get("primary_button")
         
-        # Fallback to opportunity_link if primary_button is missing
-        if not primary_button and opp.get("opportunity_link"):
-            primary_button = {"text": "Join Now", "link": opp.get("opportunity_link")}
-        
         if opp_id in customizations and customizations[opp_id]:
             # Override primary button link with user's custom link
             if primary_button:
                 primary_button = {**primary_button, "link": customizations[opp_id]}
             else:
-                # If neither primary_button nor opportunity_link exist, but customization does
+                # If primary_button doesn't exist but customization does
                 primary_button = {"text": "Join Now", "link": customizations[opp_id]}
         
         opportunities.append(OpportunityPublicResponse(
@@ -136,6 +130,7 @@ async def get_site_opportunities(subdomain: str):
             image=opp.get("image", ""),
             description=opp.get("description", ""),
             videos=opp.get("videos", []),
+            bottom_description=opp.get("bottom_description", ""),
             telegram_link=opp.get("telegram_link"),
             primary_button=primary_button,
             secondary_button=opp.get("secondary_button"),
@@ -149,16 +144,27 @@ async def get_site_opportunities(subdomain: str):
 
 @router.get("/site-settings", response_model=SiteSettingsPublicResponse)
 async def get_public_site_settings():
-    """Get public site settings (hero video URL and partners)."""
+    """Get public site settings (hero video URL, partners, and social links)."""
     db = get_database()
     
     settings = await db.site_settings.find_one()
+    
+    default_social_links = {
+        "facebook": "",
+        "instagram": "",
+        "twitter": "",
+        "youtube": "",
+        "tiktok": "",
+        "telegram": ""
+    }
     
     if not settings:
         # Return default empty settings
         return SiteSettingsPublicResponse(
             hero_video_url="",
-            partners=[]
+            facebook_group_link="",
+            partners=[],
+            social_links=default_social_links
         )
     
     # Sort partners by order
@@ -166,7 +172,9 @@ async def get_public_site_settings():
     
     return SiteSettingsPublicResponse(
         hero_video_url=settings.get("hero_video_url", ""),
-        partners=partners
+        facebook_group_link=settings.get("facebook_group_link", ""),
+        partners=partners,
+        social_links=settings.get("social_links", default_social_links)
     )
 
 

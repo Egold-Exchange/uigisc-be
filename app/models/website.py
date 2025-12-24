@@ -9,7 +9,6 @@ class WebsiteModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str  # Reference to user
     subdomain: str  # Unique subdomain (same as user.subdomain)
-    opportunity_link: str = ""  # User's main referral link
     can_update_referral: bool = True
     status: str = "unpublished"  # "active" or "unpublished"
     customizations: Dict[str, str] = {}  # opportunity_id -> custom_link
@@ -22,13 +21,17 @@ class WebsiteModel(BaseModel):
         json_encoders = {ObjectId: str}
 
 
-def website_helper(website: dict) -> dict:
-    """Convert MongoDB website document to dict."""
-    return {
+def website_helper(website: dict, user: dict = None) -> dict:
+    """Convert MongoDB website document to dict.
+    
+    Args:
+        website: The website document from MongoDB
+        user: Optional user document to include user details
+    """
+    result = {
         "id": str(website["_id"]),
         "user_id": str(website["user_id"]),
         "subdomain": website["subdomain"],
-        "opportunity_link": website.get("opportunity_link", ""),
         "can_update_referral": website.get("can_update_referral", True),
         "status": website.get("status", "unpublished"),
         "customizations": website.get("customizations", {}),
@@ -36,3 +39,15 @@ def website_helper(website: dict) -> dict:
         "last_modified": website.get("last_modified"),
         "created_at": website.get("created_at"),
     }
+    
+    # Add user details if provided
+    if user:
+        result["user_name"] = user.get("name")
+        result["user_email"] = user.get("email")
+        result["user_mobile"] = user.get("mobile")
+    else:
+        result["user_name"] = None
+        result["user_email"] = None
+        result["user_mobile"] = None
+    
+    return result

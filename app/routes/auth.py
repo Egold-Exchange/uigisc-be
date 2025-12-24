@@ -51,6 +51,8 @@ async def register(user_data: UserCreate):
         "email": user_data.email.lower(),
         "password_hash": get_password_hash(user_data.password),
         "subdomain": user_data.subdomain.lower(),
+        "name": user_data.name.strip(),
+        "mobile": user_data.mobile.strip(),
         "role": role,
         "is_verified": True,  # Auto-verified as per request
         "verification_token": verification_token,
@@ -67,7 +69,6 @@ async def register(user_data: UserCreate):
     website_doc = {
         "user_id": result.inserted_id,
         "subdomain": user_data.subdomain.lower(),
-        "opportunity_link": "",
         "can_update_referral": True,
         "status": "active",  # Auto-active as per request
         "customizations": {},
@@ -95,6 +96,8 @@ async def register(user_data: UserCreate):
             id=str(result.inserted_id),
             email=user_data.email.lower(),
             subdomain=user_data.subdomain.lower(),
+            name=user_data.name.strip(),
+            mobile=user_data.mobile.strip(),
             role=role,
             is_verified=True,
             created_at=user_doc["created_at"]
@@ -137,6 +140,8 @@ async def login(credentials: UserLogin):
             id=str(user["_id"]),
             email=user["email"],
             subdomain=user.get("subdomain"),
+            name=user.get("name"),
+            mobile=user.get("mobile"),
             role=user.get("role", "user"),
             is_verified=user.get("is_verified", False),
             created_at=user.get("created_at")
@@ -243,6 +248,8 @@ async def get_current_user_info(current_user: TokenData = Depends(get_current_us
         id=str(user["_id"]),
         email=user["email"],
         subdomain=user.get("subdomain"),
+        name=user.get("name"),
+        mobile=user.get("mobile"),
         role=user.get("role", "user"),
         is_verified=user.get("is_verified", False),
         created_at=user.get("created_at")

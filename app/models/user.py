@@ -28,6 +28,8 @@ class UserModel(BaseModel):
     email: str
     password_hash: str
     subdomain: Optional[str] = None
+    name: Optional[str] = None
+    mobile: Optional[str] = None
     role: str = "user"  # "admin" or "user"
     is_verified: bool = False
     verification_token: Optional[str] = None
@@ -51,6 +53,8 @@ def user_helper(user: dict) -> dict:
         "id": str(user["_id"]),
         "email": user["email"],
         "subdomain": user.get("subdomain"),
+        "name": user.get("name"),
+        "mobile": user.get("mobile"),
         "role": user.get("role", "user"),
         "is_verified": user.get("is_verified", False),
         "created_at": user.get("created_at"),

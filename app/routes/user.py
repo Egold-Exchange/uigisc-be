@@ -29,7 +29,12 @@ async def update_my_site_links(
     update_data: WebsiteUserUpdate,
     current_user: TokenData = Depends(get_current_user)
 ):
-    """Update opportunity button links for user's website."""
+    """Update opportunity button links for user's website.
+    
+    Customization keys can be:
+    - {oppId}_primary: Custom link for primary button
+    - {oppId}_secondary: Custom link for secondary button
+    """
     db = get_database()
     
     site = await db.websites.find_one({"user_id": ObjectId(current_user.user_id)})
@@ -43,8 +48,16 @@ async def update_my_site_links(
             detail="You are not allowed to update referral links"
         )
     
-    # Validate opportunity IDs exist
-    for opp_id in update_data.customizations.keys():
+    # Validate opportunity IDs exist (extract ID from keys like "id_primary" or "id_secondary")
+    for key in update_data.customizations.keys():
+        # Parse the key to extract opportunity ID
+        if key.endswith('_primary'):
+            opp_id = key[:-8]  # Remove '_primary' suffix
+        elif key.endswith('_secondary'):
+            opp_id = key[:-10]  # Remove '_secondary' suffix
+        else:
+            opp_id = key  # Legacy format - just the ID
+        
         try:
             opp = await db.opportunities.find_one({"_id": ObjectId(opp_id)})
             if not opp:
@@ -52,7 +65,7 @@ async def update_my_site_links(
                     status_code=400, 
                     detail=f"Invalid opportunity ID: {opp_id}"
                 )
-        except:
+        except Exception:
             raise HTTPException(
                 status_code=400, 
                 detail=f"Invalid opportunity ID format: {opp_id}"
@@ -76,12 +89,18 @@ async def update_my_site_links(
     return WebsiteResponse(**website_helper(updated_site))
 
 
-@router.delete("/site/links/{opportunity_id}")
+@router.delete("/site/links/{link_key}")
 async def remove_custom_link(
-    opportunity_id: str,
+    link_key: str,
     current_user: TokenData = Depends(get_current_user)
 ):
-    """Remove a custom link for an opportunity."""
+    """Remove a custom link for an opportunity.
+    
+    link_key can be:
+    - {oppId}_primary: Remove primary button custom link
+    - {oppId}_secondary: Remove secondary button custom link
+    - {oppId}: Legacy format - remove the custom link
+    """
     db = get_database()
     
     site = await db.websites.find_one({"user_id": ObjectId(current_user.user_id)})
@@ -91,8 +110,8 @@ async def remove_custom_link(
     
     customizations = site.get("customizations", {})
     
-    if opportunity_id in customizations:
-        del customizations[opportunity_id]
+    if link_key in customizations:
+        del customizations[link_key]
         
         await db.websites.update_one(
             {"_id": site["_id"]},

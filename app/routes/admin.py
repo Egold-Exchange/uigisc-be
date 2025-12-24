@@ -185,11 +185,17 @@ async def list_websites(current_user: TokenData = Depends(get_admin_user)):
     """List all user websites (admin only)."""
     db = get_database()
     
+    # First, get all users to map user_id to user data
+    users_map = {}
+    async for user in db.users.find():
+        users_map[str(user["_id"])] = user
+    
     websites = []
     cursor = db.websites.find().sort("created_at", -1)
     
     async for site in cursor:
-        websites.append(WebsiteResponse(**website_helper(site)))
+        user = users_map.get(str(site["user_id"]))
+        websites.append(WebsiteResponse(**website_helper(site, user)))
     
     return websites
 
@@ -210,7 +216,10 @@ async def get_website(
     if not site:
         raise HTTPException(status_code=404, detail="Website not found")
     
-    return WebsiteResponse(**website_helper(site))
+    # Get user data
+    user = await db.users.find_one({"_id": site["user_id"]})
+    
+    return WebsiteResponse(**website_helper(site, user))
 
 
 @router.put("/websites/{website_id}", response_model=WebsiteResponse)
@@ -243,7 +252,11 @@ async def update_website(
     )
     
     updated_site = await db.websites.find_one({"_id": ObjectId(website_id)})
-    return WebsiteResponse(**website_helper(updated_site))
+    
+    # Get user data
+    user = await db.users.find_one({"_id": updated_site["user_id"]})
+    
+    return WebsiteResponse(**website_helper(updated_site, user))
 
 
 @router.delete("/websites/{website_id}")
@@ -278,7 +291,16 @@ async def get_site_settings(current_user: TokenData = Depends(get_admin_user)):
         # Initialize default settings if none exist
         default_settings = {
             "hero_video_url": "",
+            "facebook_group_link": "",
             "partners": [],
+            "social_links": {
+                "facebook": "",
+                "instagram": "",
+                "twitter": "",
+                "youtube": "",
+                "tiktok": "",
+                "telegram": ""
+            },
             "last_modified": datetime.utcnow(),
             "created_at": datetime.utcnow(),
         }
@@ -300,7 +322,22 @@ async def update_site_settings(
     # Get or create settings
     settings = await db.site_settings.find_one()
     
-    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    update_dict = {}
+    
+    # Handle hero_video_url
+    if update_data.hero_video_url is not None:
+        update_dict["hero_video_url"] = update_data.hero_video_url
+    
+    # Handle facebook_group_link
+    if update_data.facebook_group_link is not None:
+        update_dict["facebook_group_link"] = update_data.facebook_group_link
+    
+    # Handle social_links - merge with existing
+    if update_data.social_links is not None:
+        existing_social = settings.get("social_links", {}) if settings else {}
+        new_social = {k: v for k, v in update_data.social_links.model_dump().items() if v is not None}
+        update_dict["social_links"] = {**existing_social, **new_social}
+    
     update_dict["last_modified"] = datetime.utcnow()
     
     if settings:
@@ -313,7 +350,16 @@ async def update_site_settings(
         # Create new settings if none exist
         new_settings = {
             "hero_video_url": update_dict.get("hero_video_url", ""),
+            "facebook_group_link": update_dict.get("facebook_group_link", ""),
             "partners": [],
+            "social_links": update_dict.get("social_links", {
+                "facebook": "",
+                "instagram": "",
+                "twitter": "",
+                "youtube": "",
+                "tiktok": "",
+                "telegram": ""
+            }),
             "last_modified": datetime.utcnow(),
             "created_at": datetime.utcnow(),
         }
@@ -339,6 +385,7 @@ async def add_partner(
         "id": str(uuid.uuid4()),
         "image_url": partner_data.image_url,
         "name": partner_data.name,
+        "link": partner_data.link,
         "order": 0
     }
     
@@ -357,7 +404,16 @@ async def add_partner(
         # Create new settings if none exist
         new_settings = {
             "hero_video_url": "",
+            "facebook_group_link": "",
             "partners": [new_partner],
+            "social_links": {
+                "facebook": "",
+                "instagram": "",
+                "twitter": "",
+                "youtube": "",
+                "tiktok": "",
+                "telegram": ""
+            },
             "last_modified": datetime.utcnow(),
             "created_at": datetime.utcnow(),
         }

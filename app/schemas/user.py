@@ -8,6 +8,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     subdomain: str = Field(..., min_length=3, max_length=30, pattern=r"^[a-zA-Z0-9]+$")
+    name: str = Field(..., min_length=2, max_length=50)
+    mobile: str = Field(..., min_length=8, max_length=20)
 
 
 class UserLogin(BaseModel):
@@ -21,6 +23,8 @@ class UserResponse(BaseModel):
     id: str
     email: str
     subdomain: Optional[str] = None
+    name: Optional[str] = None
+    mobile: Optional[str] = None
     role: str
     is_verified: bool
     created_at: Optional[datetime] = None

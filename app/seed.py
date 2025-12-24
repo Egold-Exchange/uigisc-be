@@ -55,9 +55,9 @@ async def seed_database():
             {
                 "name": "Bitnest",
                 "image": "",
-                "opportunity_link": "",
                 "description": "Learn more about Bitnest and how it can help you grow within the UIGISC community.",
                 "videos": [{"title": "Bitnest", "vimeo_id": "1030432292"}],
+                "bottom_description": "",
                 "telegram_link": None,
                 "primary_button": {"text": "Get Started", "link": "#"},
                 "secondary_button": {"text": "Learn More", "link": "#"},
@@ -71,9 +71,9 @@ async def seed_database():
             {
                 "name": "OlyLife",
                 "image": "",
-                "opportunity_link": "",
                 "description": "Learn more about OlyLife and how it can help you grow within the UIGISC community.",
                 "videos": [{"title": "OlyLife", "vimeo_id": "1030432292"}],
+                "bottom_description": "",
                 "telegram_link": None,
                 "primary_button": {"text": "Get Started", "link": "#"},
                 "secondary_button": {"text": "Learn More", "link": "#"},
@@ -87,13 +87,13 @@ async def seed_database():
             {
                 "name": "Reach Solar",
                 "image": "",
-                "opportunity_link": "https://t.me/+Rf0LShUOiVw5ZWYx",
                 "description": "Over the past decade, the solar industry has undergone transformational changes, all of which benefit the homeowner and consumer. Still, choosing solar savings is an important and impactful decision. Here at REACH Solar, we pride ourselves on educating and empowering our clients; offering comprehensive resources and transparent responses to your questions.",
                 "videos": [
                     {"title": "THE SUN", "vimeo_id": "1030432292"},
                     {"title": "MAKE MONEY WITH REACH", "vimeo_id": "1030432292"},
                     {"title": "CEO Welcome Message & Overview", "vimeo_id": "1030432292"}
                 ],
+                "bottom_description": "",
                 "telegram_link": "https://t.me/+Rf0LShUOiVw5ZWYx",
                 "primary_button": {"text": "COPY THIS LINK TO MAKE MONEY WITH REACH!", "link": "https://t.me/+Rf0LShUOiVw5ZWYx"},
                 "secondary_button": {"text": "CLICK HERE TO GET SOLAR!", "link": "#"},
@@ -107,9 +107,9 @@ async def seed_database():
             {
                 "name": "Xtrends",
                 "image": "",
-                "opportunity_link": "",
                 "description": "Built on Solana, turns social trends into tradable coins for creators, traders, and investors.",
                 "videos": [{"title": "Xtrends", "vimeo_id": "1030432292"}],
+                "bottom_description": "",
                 "telegram_link": None,
                 "primary_button": {"text": "Learn More", "link": "#"},
                 "secondary_button": {"text": "Get Started", "link": "#"},

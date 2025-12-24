@@ -19,9 +19,9 @@ class OpportunityCreate(BaseModel):
     """Schema for creating an opportunity."""
     name: str = Field(..., min_length=1, max_length=100)
     image: str = ""
-    opportunity_link: str = ""
     description: str = ""
     videos: List[VideoItem] = []
+    bottom_description: str = ""
     telegram_link: Optional[str] = None
     primary_button: Optional[ButtonItem] = None
     secondary_button: Optional[ButtonItem] = None
@@ -33,9 +33,9 @@ class OpportunityUpdate(BaseModel):
     """Schema for updating an opportunity."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     image: Optional[str] = None
-    opportunity_link: Optional[str] = None
     description: Optional[str] = None
     videos: Optional[List[VideoItem]] = None
+    bottom_description: Optional[str] = None
     telegram_link: Optional[str] = None
     primary_button: Optional[ButtonItem] = None
     secondary_button: Optional[ButtonItem] = None
@@ -49,9 +49,9 @@ class OpportunityResponse(BaseModel):
     id: str
     name: str
     image: str
-    opportunity_link: str
     description: str
     videos: List[VideoItem]
+    bottom_description: str
     telegram_link: Optional[str]
     primary_button: Optional[ButtonItem]
     secondary_button: Optional[ButtonItem]
@@ -70,6 +70,7 @@ class OpportunityPublicResponse(BaseModel):
     image: str
     description: str
     videos: List[VideoItem]
+    bottom_description: str
     telegram_link: Optional[str]
     primary_button: Optional[ButtonItem]
     secondary_button: Optional[ButtonItem]

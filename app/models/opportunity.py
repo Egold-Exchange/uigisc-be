@@ -21,9 +21,9 @@ class OpportunityModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     name: str
     image: str = ""  # URL or base64
-    opportunity_link: str = ""
     description: str = ""
     videos: List[VideoItem] = []
+    bottom_description: str = ""  # Description shown after videos
     telegram_link: Optional[str] = None
     primary_button: Optional[ButtonItem] = None
     secondary_button: Optional[ButtonItem] = None
@@ -45,9 +45,9 @@ def opportunity_helper(opportunity: dict) -> dict:
         "id": str(opportunity["_id"]),
         "name": opportunity["name"],
         "image": opportunity.get("image", ""),
-        "opportunity_link": opportunity.get("opportunity_link", ""),
         "description": opportunity.get("description", ""),
         "videos": opportunity.get("videos", []),
+        "bottom_description": opportunity.get("bottom_description", ""),
         "telegram_link": opportunity.get("telegram_link"),
         "primary_button": opportunity.get("primary_button"),
         "secondary_button": opportunity.get("secondary_button"),
