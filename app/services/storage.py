@@ -79,20 +79,29 @@ class StorageService:
                 print(f"Verification FAILED for {unique_filename}: {e}")
                 raise Exception(f"Upload verification failed: {str(e)}")
 
-            # Construct the public URL correctly
+            # Construct the CDN URL in format: https://{bucket}.{region}.cdn.digitaloceanspaces.com/{bucket}/{key}
             endpoint = settings.do_endpoint.rstrip('/')
-            if '://' in endpoint:
-                scheme, host = endpoint.split('://')
-                
-                # If host is like "bucket.region.digitaloceanspaces.com" and bucket is "bucket"
-                if host.startswith(f"{self.bucket}."):
-                    url = f"{scheme}://{host}/{unique_filename}"
-                else:
-                    url = f"{scheme}://{self.bucket}.{host}/{unique_filename}"
-            else:
-                url = f"{endpoint}/{self.bucket}/{unique_filename}"
             
-            print(f"Generated public URL: {url}")
+            # Extract region from endpoint (e.g., "sfo3" from "https://sfo3.digitaloceanspaces.com")
+            region = 'sfo3'  # default
+            if '://' in endpoint:
+                host = endpoint.split('://')[1]
+                # Parse region from endpoint formats like:
+                # - https://sfo3.digitaloceanspaces.com
+                # - https://bucket.sfo3.digitaloceanspaces.com
+                parts = host.split('.')
+                if 'digitaloceanspaces' in host:
+                    for i, part in enumerate(parts):
+                        if part == 'digitaloceanspaces':
+                            # The region is the part right before 'digitaloceanspaces'
+                            if i > 0:
+                                region = parts[i - 1]
+                            break
+            
+            # Build CDN URL: https://{bucket}.{region}.cdn.digitaloceanspaces.com/{bucket}/{key}
+            url = f"https://{self.bucket}.{region}.cdn.digitaloceanspaces.com/{self.bucket}/{unique_filename}"
+            
+            print(f"Generated CDN URL: {url}")
             return url
         except ClientError as e:
             print(f"Error uploading to DO Spaces: {e}")
