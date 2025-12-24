@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException
 from app.database import get_database
 from app.schemas.opportunity import OpportunityPublicResponse
 from app.schemas.website import WebsitePublicResponse
+from app.schemas.site_settings import SiteSettingsPublicResponse
+from app.schemas.news_media import NewsMediaPublicResponse
+from app.schemas.event_highlight import EventCategoryPublicResponse, EventHighlightPublicResponse
 from app.models.opportunity import opportunity_helper
+from app.models.site_settings import site_settings_helper
+from app.models.news_media import news_media_helper
+from app.models.event_highlight import event_category_helper, event_highlight_helper
 
 router = APIRouter()
 
@@ -139,3 +145,108 @@ async def get_site_opportunities(subdomain: str):
         ))
     
     return opportunities
+
+
+@router.get("/site-settings", response_model=SiteSettingsPublicResponse)
+async def get_public_site_settings():
+    """Get public site settings (hero video URL and partners)."""
+    db = get_database()
+    
+    settings = await db.site_settings.find_one()
+    
+    if not settings:
+        # Return default empty settings
+        return SiteSettingsPublicResponse(
+            hero_video_url="",
+            partners=[]
+        )
+    
+    # Sort partners by order
+    partners = sorted(settings.get("partners", []), key=lambda p: p.get("order", 0))
+    
+    return SiteSettingsPublicResponse(
+        hero_video_url=settings.get("hero_video_url", ""),
+        partners=partners
+    )
+
+
+@router.get("/news-media", response_model=List[NewsMediaPublicResponse])
+async def get_public_news_media():
+    """Get all active news and media items for the public page (newest first)."""
+    db = get_database()
+    
+    items = []
+    # Sort by created_at descending (newest first)
+    cursor = db.news_media.find({"status": "active"}).sort("created_at", -1)
+    
+    async for item in cursor:
+        items.append(NewsMediaPublicResponse(
+            id=str(item["_id"]),
+            vimeo_url=item.get("vimeo_url", ""),
+            title=item.get("title", ""),
+            read_more_text=item.get("read_more_text", ""),
+            read_more_url=item.get("read_more_url", ""),
+            thumbnail_url=item.get("thumbnail_url", ""),
+            is_featured=item.get("is_featured", False),
+            order=item.get("order", 0)
+        ))
+    
+    return items
+
+
+@router.get("/event-categories", response_model=List[EventCategoryPublicResponse])
+async def get_public_event_categories():
+    """Get all active event categories."""
+    db = get_database()
+    
+    categories = []
+    cursor = db.event_categories.find({"status": "active"}).sort("order", 1)
+    
+    async for category in cursor:
+        categories.append(EventCategoryPublicResponse(
+            id=str(category["_id"]),
+            name=category.get("name", ""),
+            order=category.get("order", 0)
+        ))
+    
+    return categories
+
+
+@router.get("/event-highlights", response_model=List[EventHighlightPublicResponse])
+async def get_public_event_highlights(category_id: str = None):
+    """Get all active event highlights, optionally filtered by category."""
+    db = get_database()
+    
+    # First get all active categories to map IDs to names
+    categories = {}
+    async for cat in db.event_categories.find({"status": "active"}):
+        categories[str(cat["_id"])] = cat.get("name", "")
+    
+    # Build query
+    query = {"status": "active"}
+    if category_id:
+        query["category_id"] = category_id
+    
+    events = []
+    # Sort by order, then by created_at descending
+    cursor = db.event_highlights.find(query).sort([("order", 1), ("created_at", -1)])
+    
+    async for event in cursor:
+        # Only include events with active categories
+        cat_id = event.get("category_id", "")
+        if cat_id not in categories:
+            continue
+            
+        events.append(EventHighlightPublicResponse(
+            id=str(event["_id"]),
+            vimeo_url=event.get("vimeo_url", ""),
+            title=event.get("title", ""),
+            category_id=cat_id,
+            category_name=categories.get(cat_id, ""),
+            thumbnail_url=event.get("thumbnail_url", ""),
+            duration=event.get("duration", ""),
+            is_featured=event.get("is_featured", False),
+            order=event.get("order", 0)
+        ))
+    
+    return events
