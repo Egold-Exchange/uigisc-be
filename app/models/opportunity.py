@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 from bson import ObjectId
 
@@ -14,6 +14,7 @@ class ButtonItem(BaseModel):
     """Button configuration."""
     text: str
     link: str
+    type: Literal['link', 'copy'] = 'link'
 
 
 class OpportunityModel(BaseModel):

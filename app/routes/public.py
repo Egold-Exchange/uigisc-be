@@ -7,10 +7,12 @@ from app.schemas.website import WebsitePublicResponse
 from app.schemas.site_settings import SiteSettingsPublicResponse
 from app.schemas.news_media import NewsMediaPublicResponse
 from app.schemas.event_highlight import EventCategoryPublicResponse, EventHighlightPublicResponse
+from app.schemas.page_content import PageContentPublicResponse
 from app.models.opportunity import opportunity_helper
 from app.models.site_settings import site_settings_helper
 from app.models.news_media import news_media_helper
 from app.models.event_highlight import event_category_helper, event_highlight_helper
+from app.models.page_content import DEFAULT_CONTENT_MAP
 
 router = APIRouter()
 
@@ -258,3 +260,25 @@ async def get_public_event_highlights(category_id: str = None):
         ))
     
     return events
+
+
+@router.get("/page-content/{section_key}", response_model=PageContentPublicResponse)
+async def get_public_page_content(section_key: str):
+    """Get page content for a specific section (public)."""
+    db = get_database()
+    
+    content = await db.page_content.find_one({"section_key": section_key})
+    
+    if not content:
+        # Return default content for known sections
+        default_content = DEFAULT_CONTENT_MAP.get(section_key, {})
+        
+        return PageContentPublicResponse(
+            section_key=section_key,
+            content=default_content
+        )
+    
+    return PageContentPublicResponse(
+        section_key=content.get("section_key", section_key),
+        content=content.get("content", {})
+    )

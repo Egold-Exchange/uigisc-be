@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 
@@ -13,6 +13,7 @@ class ButtonItem(BaseModel):
     """Button configuration schema."""
     text: str
     link: str
+    type: Literal['link', 'copy'] = 'link'
 
 
 class OpportunityCreate(BaseModel):
@@ -77,3 +78,8 @@ class OpportunityPublicResponse(BaseModel):
     status: str
     is_featured: bool
     order: int
+
+
+class OpportunityReorderRequest(BaseModel):
+    """Schema for reordering opportunities."""
+    opportunity_ids: List[str] = Field(..., description="List of opportunity IDs in the desired order")

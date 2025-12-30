@@ -5,7 +5,7 @@ from bson import ObjectId
 
 from app.database import get_database
 from app.schemas.opportunity import (
-    OpportunityCreate, OpportunityUpdate, OpportunityResponse
+    OpportunityCreate, OpportunityUpdate, OpportunityResponse, OpportunityReorderRequest
 )
 from app.schemas.website import WebsiteUpdate, WebsiteResponse
 from app.schemas.site_settings import (
@@ -19,6 +19,9 @@ from app.schemas.event_highlight import (
     EventCategoryCreate, EventCategoryUpdate, EventCategoryResponse,
     EventHighlightCreate, EventHighlightUpdate, EventHighlightResponse
 )
+from app.schemas.page_content import (
+    PageContentUpdate, PageContentResponse
+)
 from app.middleware.auth import get_admin_user
 from app.schemas.user import TokenData
 from app.models.opportunity import opportunity_helper
@@ -26,6 +29,7 @@ from app.models.website import website_helper
 from app.models.site_settings import site_settings_helper
 from app.models.news_media import news_media_helper
 from app.models.event_highlight import event_category_helper, event_highlight_helper
+from app.models.page_content import page_content_helper, DEFAULT_CONTENT_MAP
 from app.services.storage import storage_service
 import uuid
 
@@ -104,6 +108,34 @@ async def create_opportunity(
     opp_doc["_id"] = result.inserted_id
     
     return OpportunityResponse(**opportunity_helper(opp_doc))
+
+
+@router.put("/opportunities/reorder", response_model=List[OpportunityResponse])
+async def reorder_opportunities(
+    reorder_data: OpportunityReorderRequest,
+    current_user: TokenData = Depends(get_admin_user)
+):
+    """Reorder opportunities (admin only)."""
+    db = get_database()
+    
+    # Update order for each opportunity based on its position in the list
+    for idx, opp_id in enumerate(reorder_data.opportunity_ids):
+        try:
+            await db.opportunities.update_one(
+                {"_id": ObjectId(opp_id)},
+                {"$set": {"order": idx, "last_modified": datetime.utcnow()}}
+            )
+        except:
+            raise HTTPException(status_code=400, detail=f"Invalid opportunity ID: {opp_id}")
+    
+    # Return the reordered list
+    opportunities = []
+    cursor = db.opportunities.find().sort("order", 1)
+    
+    async for opp in cursor:
+        opportunities.append(OpportunityResponse(**opportunity_helper(opp)))
+    
+    return opportunities
 
 
 @router.get("/opportunities/{opportunity_id}", response_model=OpportunityResponse)
@@ -873,3 +905,69 @@ async def delete_event_highlight(
         raise HTTPException(status_code=404, detail="Event highlight not found")
     
     return {"message": "Event highlight deleted"}
+
+
+# ==================== PAGE CONTENT ====================
+
+@router.get("/page-content/{section_key}", response_model=PageContentResponse)
+async def get_page_content(
+    section_key: str,
+    current_user: TokenData = Depends(get_admin_user)
+):
+    """Get page content for a specific section (admin only)."""
+    db = get_database()
+    
+    content = await db.page_content.find_one({"section_key": section_key})
+    
+    if not content:
+        # Return default content for known sections
+        default_content = DEFAULT_CONTENT_MAP.get(section_key, {})
+        
+        # Create new content entry
+        new_content = {
+            "section_key": section_key,
+            "content": default_content,
+            "last_modified": datetime.utcnow(),
+            "created_at": datetime.utcnow(),
+        }
+        result = await db.page_content.insert_one(new_content)
+        new_content["_id"] = result.inserted_id
+        return PageContentResponse(**page_content_helper(new_content))
+    
+    return PageContentResponse(**page_content_helper(content))
+
+
+@router.put("/page-content/{section_key}", response_model=PageContentResponse)
+async def update_page_content(
+    section_key: str,
+    update_data: PageContentUpdate,
+    current_user: TokenData = Depends(get_admin_user)
+):
+    """Update page content for a specific section (admin only)."""
+    db = get_database()
+    
+    content = await db.page_content.find_one({"section_key": section_key})
+    
+    if content:
+        # Merge new content with existing content
+        existing_content = content.get("content", {})
+        merged_content = {**existing_content, **update_data.content}
+        
+        await db.page_content.update_one(
+            {"_id": content["_id"]},
+            {"$set": {"content": merged_content, "last_modified": datetime.utcnow()}}
+        )
+        updated_content = await db.page_content.find_one({"_id": content["_id"]})
+    else:
+        # Create new content entry
+        new_content = {
+            "section_key": section_key,
+            "content": update_data.content,
+            "last_modified": datetime.utcnow(),
+            "created_at": datetime.utcnow(),
+        }
+        result = await db.page_content.insert_one(new_content)
+        new_content["_id"] = result.inserted_id
+        updated_content = new_content
+    
+    return PageContentResponse(**page_content_helper(updated_content))
