@@ -30,7 +30,7 @@ origins = [origin.strip() for origin in settings.allowed_origins.split(",") if o
 
 # Always include the production frontend URL
 production_origins = [
-    "https://uigsc.vercel.app",
+    "https://uigisc.com",
     "http://localhost:5173",
     "http://localhost:3000",
 ]

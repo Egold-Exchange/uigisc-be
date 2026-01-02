@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     email_from: str = "noreply@uigisc.com"
     
     # Frontend
-    frontend_url: str = "https://uigsc.vercel.app"
-    allowed_origins: str = "http://localhost:5173,http://localhost:3000,https://uigsc.vercel.app"
+    frontend_url: str = "https://uigisc.com"
+    allowed_origins: str = "http://localhost:5173,http://localhost:3000,https://uigisc.com"
     
     # Environment
     environment: str = "development"
