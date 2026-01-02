@@ -25,24 +25,14 @@ app = FastAPI(
 )
 
 # Configure CORS
-# Parse allowed origins from settings and ensure production URL is always included
-origins = [origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()]
-
-# Always include the production frontend URL
-production_origins = [
-    "https://uigisc.com",
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
-
-# Merge origins, ensuring no duplicates
-all_origins = list(set(origins + production_origins))
+# Allow all origins as requested
+all_origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=all_origins,
     # Support Vercel preview deployments (e.g., uigsc-abc123-username.vercel.app)
-    allow_origin_regex=r"https://uigsc(-[a-zA-Z0-9-]+)?\.vercel\.app",
+    # allow_origin_regex=r"https://uigsc(-[a-zA-Z0-9-]+)?\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
