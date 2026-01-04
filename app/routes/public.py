@@ -117,14 +117,32 @@ async def get_site_opportunities(subdomain: str):
         
         # Apply customizations if any
         primary_button = opp.get("primary_button")
+        secondary_button = opp.get("secondary_button")
         
-        if opp_id in customizations and customizations[opp_id]:
+        # Check for new format: {opp_id}_primary and {opp_id}_secondary
+        primary_key = f"{opp_id}_primary"
+        secondary_key = f"{opp_id}_secondary"
+        
+        # Also support legacy format: just {opp_id}
+        if primary_key in customizations and customizations[primary_key]:
             # Override primary button link with user's custom link
+            if primary_button:
+                primary_button = {**primary_button, "link": customizations[primary_key]}
+            else:
+                primary_button = {"text": "Join Now", "link": customizations[primary_key], "type": "link"}
+        elif opp_id in customizations and customizations[opp_id]:
+            # Legacy format support
             if primary_button:
                 primary_button = {**primary_button, "link": customizations[opp_id]}
             else:
-                # If primary_button doesn't exist but customization does
-                primary_button = {"text": "Join Now", "link": customizations[opp_id]}
+                primary_button = {"text": "Join Now", "link": customizations[opp_id], "type": "link"}
+        
+        if secondary_key in customizations and customizations[secondary_key]:
+            # Override secondary button link with user's custom link
+            if secondary_button:
+                secondary_button = {**secondary_button, "link": customizations[secondary_key]}
+            else:
+                secondary_button = {"text": "Learn More", "link": customizations[secondary_key], "type": "link"}
         
         opportunities.append(OpportunityPublicResponse(
             id=opp_id,
@@ -135,7 +153,7 @@ async def get_site_opportunities(subdomain: str):
             bottom_description=opp.get("bottom_description", ""),
             telegram_link=opp.get("telegram_link"),
             primary_button=primary_button,
-            secondary_button=opp.get("secondary_button"),
+            secondary_button=secondary_button,
             status=opp.get("status", "active"),
             is_featured=opp.get("is_featured", False),
             order=opp.get("order", 0)
