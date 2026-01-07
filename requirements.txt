@@ -23,6 +23,9 @@ slowapi==0.1.9
 # AWS SDK for SNS/SES
 boto3==1.35.0
 
+# Email
+aiosmtplib==3.0.1
+
 # Testing
 pytest==8.3.0
 pytest-asyncio==0.24.0
