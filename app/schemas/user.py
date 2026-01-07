@@ -54,7 +54,43 @@ class SendVerificationRequest(BaseModel):
     email: EmailStr
 
 
+class SendVerificationCodeRequest(BaseModel):
+    """Schema for requesting verification code via SNS/SES."""
+    email: EmailStr
+
+
+class VerifyCodeRequest(BaseModel):
+    """Schema for verifying a code."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class VerificationCodeResponse(BaseModel):
+    """Schema for verification code response."""
+    success: bool
+    message: str
+    dev_code: Optional[str] = None  # Only returned in development mode
+
+
 class PasswordChange(BaseModel):
     """Schema for password change."""
     current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema for requesting password reset code."""
+    email: EmailStr
+
+
+class VerifyResetCodeRequest(BaseModel):
+    """Schema for verifying password reset code."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema for resetting password with verified code."""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
     new_password: str = Field(..., min_length=8)

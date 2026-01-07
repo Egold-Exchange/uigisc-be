@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     dospace_access_key: str = ""
     dospace_endpoint: str = ""
     dospace_bucket_name: str = ""
+    
+    # AWS SNS/SES Settings for Email Verification
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "us-east-1"
+    ses_sender_email: str = ""  # Verified sender email in AWS SES
 
     @property
     def do_secret(self) -> str:

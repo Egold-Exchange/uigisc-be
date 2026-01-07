@@ -5,13 +5,23 @@ from bson import ObjectId
 from app.database import get_database
 from app.schemas.user import (
     UserCreate, UserLogin, UserResponse, Token, 
-    VerificationRequest, SendVerificationRequest
+    VerificationRequest, SendVerificationRequest,
+    SendVerificationCodeRequest, VerifyCodeRequest, VerificationCodeResponse,
+    ForgotPasswordRequest, VerifyResetCodeRequest, ResetPasswordRequest
 )
 from app.services.auth import (
     get_password_hash, verify_password, create_access_token,
     generate_verification_token, is_admin_email
 )
 from app.services.email import send_verification_email
+from app.services.sns import (
+    send_verification_code_email, 
+    verify_code,
+    send_password_reset_code_email,
+    verify_password_reset_code,
+    is_reset_code_verified,
+    clear_password_reset_code
+)
 from app.models.user import user_helper
 from app.middleware.auth import get_current_user
 from app.schemas.user import TokenData
@@ -232,6 +242,55 @@ async def verify_email(request: VerificationRequest):
     return {"message": "Email verified successfully"}
 
 
+@router.post("/send-code", response_model=VerificationCodeResponse)
+async def send_verification_code(request: SendVerificationCodeRequest):
+    """
+    Send a verification code to the user's email via AWS SES.
+    Used during registration to verify email before creating account.
+    """
+    db = get_database()
+    
+    # Check if email is already registered
+    existing_user = await db.users.find_one({"email": request.email.lower()})
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered. Please login instead."
+        )
+    
+    # Send verification code
+    result = await send_verification_code_email(request.email)
+    
+    if not result['success']:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get('error', 'Failed to send verification code')
+        )
+    
+    return VerificationCodeResponse(
+        success=True,
+        message=result.get('message', 'Verification code sent'),
+        dev_code=result.get('dev_code')  # Only in dev mode
+    )
+
+
+@router.post("/verify-code")
+async def verify_verification_code(request: VerifyCodeRequest):
+    """
+    Verify the code entered by the user.
+    Returns success if the code is valid.
+    """
+    result = verify_code(request.email, request.code)
+    
+    if not result['valid']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result['message']
+        )
+    
+    return {"verified": True, "message": result['message']}
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: TokenData = Depends(get_current_user)):
     """Get current user information."""
@@ -254,3 +313,112 @@ async def get_current_user_info(current_user: TokenData = Depends(get_current_us
         is_verified=user.get("is_verified", False),
         created_at=user.get("created_at")
     )
+
+
+# ==================== FORGOT PASSWORD ENDPOINTS ====================
+
+@router.post("/forgot-password", response_model=VerificationCodeResponse)
+async def forgot_password(request: ForgotPasswordRequest):
+    """
+    Send a password reset code to the user's email.
+    Returns success even if email doesn't exist (security measure).
+    """
+    db = get_database()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": request.email.lower()})
+    
+    # For security, always return success message even if user doesn't exist
+    if not user:
+        return VerificationCodeResponse(
+            success=True,
+            message="If an account exists with this email, a password reset code has been sent."
+        )
+    
+    # Send password reset code
+    result = await send_password_reset_code_email(request.email)
+    
+    if not result['success']:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get('error', 'Failed to send password reset code')
+        )
+    
+    return VerificationCodeResponse(
+        success=True,
+        message="If an account exists with this email, a password reset code has been sent.",
+        dev_code=result.get('dev_code')  # Only in dev mode
+    )
+
+
+@router.post("/verify-reset-code")
+async def verify_reset_code(request: VerifyResetCodeRequest):
+    """
+    Verify the password reset code.
+    Must be called before reset-password to validate the code.
+    """
+    db = get_database()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": request.email.lower()})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email or code"
+        )
+    
+    # Verify the code
+    result = verify_password_reset_code(request.email, request.code)
+    
+    if not result['valid']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result['message']
+        )
+    
+    return {"verified": True, "message": result['message']}
+
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """
+    Reset the user's password after code verification.
+    The code must have been verified via /verify-reset-code first.
+    """
+    db = get_database()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": request.email.lower()})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid request"
+        )
+    
+    # Verify the reset code is valid and was verified
+    if not is_reset_code_verified(request.email):
+        # If code wasn't verified, try to verify it now
+        result = verify_password_reset_code(request.email, request.code)
+        if not result['valid']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result['message']
+            )
+    
+    # Update the password
+    new_password_hash = get_password_hash(request.new_password)
+    
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {
+                "password_hash": new_password_hash,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    # Clear the reset code
+    clear_password_reset_code(request.email)
+    
+    return {"success": True, "message": "Password has been reset successfully. You can now log in with your new password."}

@@ -20,12 +20,11 @@ email-validator==2.2.0
 # CORS & Security
 slowapi==0.1.9
 
-# Email (placeholder - choose provider later)
-aiosmtplib==3.0.2
+# AWS SDK for SNS/SES
+boto3==1.35.0
 
 # Testing
 pytest==8.3.0
 pytest-asyncio==0.24.0
 httpx==0.28.0
-boto3==1.35.0
 aiofiles==24.1.0
