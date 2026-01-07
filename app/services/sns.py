@@ -74,33 +74,20 @@ async def send_verification_code_email(email: str) -> dict:
         # Check environment
         print(f"[AWS SES DEBUG] Current environment: '{settings.environment}'")
         
-        if settings.environment == "development":
-            # In development, just log the code
-            print(f"[DEV MODE] Skipping AWS SES - Verification code for {email}: {code}")
-            return {
-                'success': True,
-                'message': 'Verification code sent (dev mode)',
-                'dev_code': code  # Only in dev mode for testing
-            }
-        
         # Check if AWS is configured
         print(f"[AWS SES DEBUG] Checking AWS configuration...")
         if not settings.aws_access_key_id or not settings.aws_secret_access_key:
-            print(f"[WARNING] AWS credentials not configured!")
-            print(f"[WARNING] Code for {email}: {code}")
+            print(f"[ERROR] AWS credentials not configured - cannot send verification email!")
             return {
-                'success': True,
-                'message': 'Verification code generated (AWS not configured)',
-                'dev_code': code
+                'success': False,
+                'error': 'Email service not configured. Please contact support.'
             }
         
         if not settings.ses_sender_email:
-            print(f"[WARNING] SES_SENDER_EMAIL is empty or not set!")
-            print(f"[WARNING] Code for {email}: {code}")
+            print(f"[ERROR] SES_SENDER_EMAIL is empty or not set!")
             return {
-                'success': True,
-                'message': 'Verification code generated (SES sender email not configured)',
-                'dev_code': code
+                'success': False,
+                'error': 'Email service not configured. Please contact support.'
             }
         
         print(f"[AWS SES DEBUG] Configuration OK, preparing to send email...")
@@ -281,22 +268,12 @@ async def send_password_reset_code_email(email: str) -> dict:
         # Check environment
         print(f"[AWS SES DEBUG] Current environment: '{settings.environment}'")
         
-        if settings.environment == "development":
-            # In development, just log the code
-            print(f"[DEV MODE] Skipping AWS SES - Password reset code for {email}: {code}")
-            return {
-                'success': True,
-                'message': 'Password reset code sent (dev mode)',
-                'dev_code': code  # Only in dev mode for testing
-            }
-        
         # Check if AWS is configured
         if not settings.aws_access_key_id or not settings.aws_secret_access_key or not settings.ses_sender_email:
-            print(f"[WARNING] AWS SES not fully configured. Reset code for {email}: {code}")
+            print(f"[ERROR] AWS SES not fully configured - cannot send password reset email!")
             return {
-                'success': True,
-                'message': 'Password reset code generated (AWS not configured)',
-                'dev_code': code
+                'success': False,
+                'error': 'Email service not configured. Please contact support.'
             }
         
         print(f"[AWS SES DEBUG] Configuration OK, preparing to send password reset email...")

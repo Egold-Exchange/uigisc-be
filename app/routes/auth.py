@@ -269,8 +269,7 @@ async def send_verification_code(request: SendVerificationCodeRequest):
     
     return VerificationCodeResponse(
         success=True,
-        message=result.get('message', 'Verification code sent'),
-        dev_code=result.get('dev_code')  # Only in dev mode
+        message=result.get('message', 'Verification code sent')
     )
 
 
@@ -346,8 +345,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     
     return VerificationCodeResponse(
         success=True,
-        message="If an account exists with this email, a password reset code has been sent.",
-        dev_code=result.get('dev_code')  # Only in dev mode
+        message="If an account exists with this email, a password reset code has been sent."
     )
 
 

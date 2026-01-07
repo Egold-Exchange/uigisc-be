@@ -69,7 +69,6 @@ class VerificationCodeResponse(BaseModel):
     """Schema for verification code response."""
     success: bool
     message: str
-    dev_code: Optional[str] = None  # Only returned in development mode
 
 
 class PasswordChange(BaseModel):
