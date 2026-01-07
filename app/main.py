@@ -24,19 +24,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
-# Parse allowed origins from settings (comma-separated string to list)
-allowed_origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://uigisc.com",
-    "https://www.uigisc.com",
-]
-
+# Configure CORS - Allow all origins for user subdomains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Must be False when using wildcard origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
