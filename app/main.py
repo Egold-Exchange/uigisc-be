@@ -25,14 +25,17 @@ app = FastAPI(
 )
 
 # Configure CORS
-# Allow all origins as requested
-all_origins = ["*"]
+# Parse allowed origins from settings (comma-separated string to list)
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://uigisc.com",
+    "https://www.uigisc.com",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=all_origins,
-    # Support Vercel preview deployments (e.g., uigsc-abc123-username.vercel.app)
-    # allow_origin_regex=r"https://uigsc(-[a-zA-Z0-9-]+)?\.vercel\.app",
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

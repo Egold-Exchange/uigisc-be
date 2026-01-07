@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     
     # Frontend
     frontend_url: str = "https://uigisc.com"
-    allowed_origins: str = "http://localhost:5173,http://localhost:3000,https://uigisc.com"
+    allowed_origins: str = "http://localhost:5173,http://localhost:3000,https://uigisc.com,https://www.uigisc.com"
     
     # Environment
     environment: str = "development"
