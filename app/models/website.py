@@ -12,6 +12,7 @@ class WebsiteModel(BaseModel):
     can_update_referral: bool = True
     status: str = "unpublished"  # "active" or "unpublished"
     customizations: Dict[str, str] = {}  # opportunity_id -> custom_link
+    social_links: Optional[Dict[str, str]] = None  # owner override: facebook, instagram, twitter, youtube, tiktok, telegram
     date_published: Optional[datetime] = None
     last_modified: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -35,6 +36,7 @@ def website_helper(website: dict, user: dict = None) -> dict:
         "can_update_referral": website.get("can_update_referral", True),
         "status": website.get("status", "unpublished"),
         "customizations": website.get("customizations", {}),
+        "social_links": website.get("social_links"),
         "date_published": website.get("date_published"),
         "last_modified": website.get("last_modified"),
         "created_at": website.get("created_at"),

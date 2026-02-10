@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 
 from app.database import get_database
-from app.schemas.website import WebsiteUserUpdate, WebsiteResponse
+from app.schemas.website import WebsiteUserUpdate, WebsiteResponse, WebsiteSocialLinksUpdate
 from app.middleware.auth import get_current_user
 from app.schemas.user import TokenData
 from app.models.website import website_helper
@@ -85,6 +85,47 @@ async def update_my_site_links(
         }
     )
     
+    updated_site = await db.websites.find_one({"_id": site["_id"]})
+    return WebsiteResponse(**website_helper(updated_site))
+
+
+@router.put("/site/social-links", response_model=WebsiteResponse)
+async def update_my_site_social_links(
+    update_data: WebsiteSocialLinksUpdate,
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Update social media links for the current user's website.
+    Only provided fields are updated. Empty string clears the override (admin default will be used).
+    """
+    db = get_database()
+
+    site = await db.websites.find_one({"user_id": ObjectId(current_user.user_id)})
+
+    if not site:
+        raise HTTPException(status_code=404, detail="Website not found")
+
+    keys = ("facebook", "instagram", "twitter", "youtube", "tiktok", "telegram")
+    existing = site.get("social_links") or {}
+    merged = dict(existing)
+    payload = update_data.model_dump(exclude_unset=True)
+    for key in keys:
+        if key in payload:
+            val = (payload[key] or "").strip()
+            if val:
+                merged[key] = val
+            elif key in merged:
+                del merged[key]
+
+    await db.websites.update_one(
+        {"_id": site["_id"]},
+        {
+            "$set": {
+                "social_links": merged,
+                "last_modified": datetime.utcnow()
+            }
+        }
+    )
+
     updated_site = await db.websites.find_one({"_id": site["_id"]})
     return WebsiteResponse(**website_helper(updated_site))
 

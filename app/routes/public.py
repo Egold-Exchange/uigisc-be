@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.database import get_database
 from app.schemas.opportunity import OpportunityPublicResponse
 from app.schemas.website import WebsitePublicResponse
-from app.schemas.site_settings import SiteSettingsPublicResponse
+from app.schemas.site_settings import SiteSettingsPublicResponse, SocialLinks
 from app.schemas.news_media import NewsMediaPublicResponse
 from app.schemas.event_highlight import EventCategoryPublicResponse, EventHighlightPublicResponse
 from app.schemas.page_content import PageContentPublicResponse
@@ -144,7 +144,52 @@ async def get_user_site(subdomain: str):
     
     return WebsitePublicResponse(
         subdomain=site["subdomain"],
-        customizations=site.get("customizations", {})
+        customizations=site.get("customizations", {}),
+        social_links=site.get("social_links")
+    )
+
+
+@router.get("/site/{subdomain}/site-settings", response_model=SiteSettingsPublicResponse)
+async def get_site_settings_for_subdomain(subdomain: str):
+    """Get site settings for an owner subdomain with merged social links.
+    Owner overrides (when non-empty) take precedence over admin defaults.
+    """
+    db = get_database()
+
+    site = await db.websites.find_one({
+        "subdomain": subdomain.lower(),
+        "status": "active"
+    })
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    settings = await db.site_settings.find_one()
+    default_social = {
+        "facebook": "",
+        "instagram": "",
+        "twitter": "",
+        "youtube": "",
+        "tiktok": "",
+        "telegram": ""
+    }
+    admin_links = (settings.get("social_links") or default_social).copy()
+    for k in default_social:
+        if k not in admin_links:
+            admin_links[k] = ""
+
+    owner_links = site.get("social_links") or {}
+    merged = {}
+    for key in default_social:
+        owner_val = (owner_links.get(key) or "").strip()
+        merged[key] = owner_val if owner_val else admin_links.get(key, "")
+
+    partners = sorted(settings.get("partners", []), key=lambda p: p.get("order", 0)) if settings else []
+
+    return SiteSettingsPublicResponse(
+        hero_video_url=settings.get("hero_video_url", "") if settings else "",
+        facebook_group_link=settings.get("facebook_group_link", "") if settings else "",
+        partners=partners,
+        social_links=SocialLinks(**merged)
     )
 
 

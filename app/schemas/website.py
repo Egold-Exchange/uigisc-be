@@ -1,6 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from datetime import datetime
+
+# Reuse social link keys; optional strings for owner overrides
+SOCIAL_LINK_KEYS = ("facebook", "instagram", "twitter", "youtube", "tiktok", "telegram")
 
 
 class WebsiteCreate(BaseModel):
@@ -21,6 +24,16 @@ class WebsiteUserUpdate(BaseModel):
     customizations: Dict[str, str] = {}  # opportunity_id -> custom_link
 
 
+class WebsiteSocialLinksUpdate(BaseModel):
+    """Schema for user updating their own social links (partial; empty string = use admin default)."""
+    facebook: Optional[str] = None
+    instagram: Optional[str] = None
+    twitter: Optional[str] = None
+    youtube: Optional[str] = None
+    tiktok: Optional[str] = None
+    telegram: Optional[str] = None
+
+
 class WebsiteResponse(BaseModel):
     """Schema for website response."""
     id: str
@@ -29,6 +42,7 @@ class WebsiteResponse(BaseModel):
     can_update_referral: bool
     status: str
     customizations: Dict[str, str]
+    social_links: Optional[Dict[str, str]] = None
     date_published: Optional[datetime]
     last_modified: Optional[datetime]
     created_at: Optional[datetime]
@@ -42,3 +56,4 @@ class WebsitePublicResponse(BaseModel):
     """Schema for public website data (for user sites)."""
     subdomain: str
     customizations: Dict[str, str]
+    social_links: Optional[Dict[str, str]] = None
