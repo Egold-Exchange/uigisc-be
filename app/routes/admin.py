@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, File, UploadFile
+from fastapi.responses import StreamingResponse
 from bson import ObjectId
+import csv
+import io
 
 from app.database import get_database
 from app.schemas.opportunity import (
@@ -22,10 +25,12 @@ from app.schemas.event_highlight import (
 from app.schemas.page_content import (
     PageContentUpdate, PageContentResponse
 )
+from app.schemas.car_giveaway import CarGiveawaySubmissionResponse
 from app.middleware.auth import get_admin_user
 from app.schemas.user import TokenData
 from app.models.opportunity import opportunity_helper
 from app.models.website import website_helper
+from app.models.car_giveaway import car_giveaway_submission_helper
 from app.models.site_settings import site_settings_helper
 from app.models.news_media import news_media_helper
 from app.models.event_highlight import event_category_helper, event_highlight_helper
@@ -34,6 +39,14 @@ from app.services.storage import storage_service
 import uuid
 
 router = APIRouter()
+
+
+def _format_csv_datetime(value):
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
 
 
 # ==================== UTILS/STORAGE ====================
@@ -230,6 +243,116 @@ async def list_websites(current_user: TokenData = Depends(get_admin_user)):
         websites.append(WebsiteResponse(**website_helper(site, user)))
     
     return websites
+
+
+@router.get("/websites/export/csv")
+async def export_websites_csv(current_user: TokenData = Depends(get_admin_user)):
+    """Export all websites (active + unpublished) with user information as CSV."""
+    db = get_database()
+
+    users_map = {}
+    async for user in db.users.find():
+        users_map[str(user["_id"])] = user
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "website_id",
+        "user_id",
+        "name",
+        "email",
+        "mobile",
+        "subdomain",
+        "status",
+        "can_update_referral",
+        "date_published",
+        "last_modified",
+        "created_at",
+    ])
+
+    cursor = db.websites.find().sort("created_at", -1)
+    async for site in cursor:
+        user = users_map.get(str(site.get("user_id")))
+        row = website_helper(site, user)
+        writer.writerow([
+            row.get("id", ""),
+            row.get("user_id", ""),
+            row.get("user_name", ""),
+            row.get("user_email", ""),
+            row.get("user_mobile", ""),
+            row.get("subdomain", ""),
+            row.get("status", ""),
+            row.get("can_update_referral", False),
+            _format_csv_datetime(row.get("date_published")),
+            _format_csv_datetime(row.get("last_modified")),
+            _format_csv_datetime(row.get("created_at")),
+        ])
+
+    filename = f"websites_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/car-giveaway", response_model=List[CarGiveawaySubmissionResponse])
+async def list_car_giveaway_submissions(
+    current_user: TokenData = Depends(get_admin_user)
+):
+    """List all car giveaway submissions (admin only)."""
+    db = get_database()
+
+    submissions = []
+    cursor = db.car_giveaway_submissions.find().sort("created_at", -1)
+    async for submission in cursor:
+        submissions.append(
+            CarGiveawaySubmissionResponse(
+                **car_giveaway_submission_helper(submission)
+            )
+        )
+
+    return submissions
+
+
+@router.get("/car-giveaway/export/csv")
+async def export_car_giveaway_csv(current_user: TokenData = Depends(get_admin_user)):
+    """Export all car giveaway submissions as CSV."""
+    db = get_database()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "submission_id",
+        "first_name",
+        "last_name",
+        "phone",
+        "email",
+        "agreed_to_rules",
+        "created_at",
+    ])
+
+    cursor = db.car_giveaway_submissions.find().sort("created_at", -1)
+    async for submission in cursor:
+        row = car_giveaway_submission_helper(submission)
+        writer.writerow([
+            row.get("id", ""),
+            row.get("first_name", ""),
+            row.get("last_name", ""),
+            row.get("phone", ""),
+            row.get("email", ""),
+            row.get("agreed_to_rules", False),
+            _format_csv_datetime(row.get("created_at")),
+        ])
+
+    filename = f"car_giveaway_submissions_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/websites/{website_id}", response_model=WebsiteResponse)

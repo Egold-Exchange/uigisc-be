@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException
 
@@ -8,11 +9,16 @@ from app.schemas.site_settings import SiteSettingsPublicResponse
 from app.schemas.news_media import NewsMediaPublicResponse
 from app.schemas.event_highlight import EventCategoryPublicResponse, EventHighlightPublicResponse
 from app.schemas.page_content import PageContentPublicResponse
+from app.schemas.car_giveaway import (
+    CarGiveawaySubmissionCreate,
+    CarGiveawaySubmissionResponse,
+)
 from app.models.opportunity import opportunity_helper
 from app.models.site_settings import site_settings_helper
 from app.models.news_media import news_media_helper
 from app.models.event_highlight import event_category_helper, event_highlight_helper
 from app.models.page_content import DEFAULT_CONTENT_MAP
+from app.models.car_giveaway import car_giveaway_submission_helper
 
 router = APIRouter()
 
@@ -71,6 +77,28 @@ async def check_subdomain_availability(subdomain: str):
         return {"available": False, "message": "Subdomain already taken"}
     
     return {"available": True, "message": "Subdomain is available"}
+
+
+@router.post("/car-giveaway", response_model=CarGiveawaySubmissionResponse, status_code=201)
+async def submit_car_giveaway_form(form_data: CarGiveawaySubmissionCreate):
+    """Store a public car giveaway form submission."""
+    db = get_database()
+
+    submission_doc = {
+        "first_name": form_data.first_name.strip(),
+        "last_name": form_data.last_name.strip(),
+        "phone": form_data.phone.strip(),
+        "email": form_data.email.lower().strip(),
+        "agreed_to_rules": form_data.agreed_to_rules,
+        "created_at": datetime.utcnow(),
+    }
+
+    result = await db.car_giveaway_submissions.insert_one(submission_doc)
+    submission_doc["_id"] = result.inserted_id
+
+    return CarGiveawaySubmissionResponse(
+        **car_giveaway_submission_helper(submission_doc)
+    )
     
     
 @router.get("/site/{subdomain}", response_model=WebsitePublicResponse)
