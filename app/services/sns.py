@@ -241,7 +241,7 @@ def clear_verification_code(email: str) -> None:
 
 # ==================== PASSWORD RESET FUNCTIONS ====================
 
-async def send_password_reset_code_email(email: str) -> dict:
+async def send_password_reset_code_email(email: str, code: str = None) -> dict:
     """
     Send a password reset code to the user's email using AWS SES.
     
@@ -253,17 +253,10 @@ async def send_password_reset_code_email(email: str) -> dict:
     print(f"[AWS SES DEBUG] Attempting to send password reset code to: {email}")
     
     try:
-        # Generate 6-digit code
-        code = generate_verification_code()
+        # Generate 6-digit code if not provided by caller
+        if not code:
+            code = generate_verification_code()
         print(f"[AWS SES DEBUG] Generated reset code: {code}")
-        
-        # Store code with 15-minute expiry (longer for password reset)
-        password_reset_codes[email.lower()] = {
-            'code': code,
-            'expires_at': datetime.utcnow() + timedelta(minutes=15),
-            'attempts': 0,
-            'verified': False
-        }
         
         # Check environment
         print(f"[AWS SES DEBUG] Current environment: '{settings.environment}'")

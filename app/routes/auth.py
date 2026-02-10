@@ -18,9 +18,7 @@ from app.services.sns import (
     send_verification_code_email, 
     verify_code,
     send_password_reset_code_email,
-    verify_password_reset_code,
-    is_reset_code_verified,
-    clear_password_reset_code
+    generate_verification_code
 )
 from app.models.user import user_helper
 from app.middleware.auth import get_current_user
@@ -324,8 +322,10 @@ async def forgot_password(request: ForgotPasswordRequest):
     """
     db = get_database()
     
+    normalized_email = request.email.lower().strip()
+
     # Check if user exists
-    user = await db.users.find_one({"email": request.email.lower()})
+    user = await db.users.find_one({"email": normalized_email})
     
     # For security, always return success message even if user doesn't exist
     if not user:
@@ -334,8 +334,24 @@ async def forgot_password(request: ForgotPasswordRequest):
             message="If an account exists with this email, a password reset code has been sent."
         )
     
-    # Send password reset code
-    result = await send_password_reset_code_email(request.email)
+    # Generate and persist reset code in DB (worker-safe across processes)
+    reset_code = generate_verification_code()
+    reset_expiry = datetime.utcnow() + timedelta(minutes=15)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {
+                "password_reset_code": reset_code,
+                "password_reset_expires_at": reset_expiry,
+                "password_reset_attempts": 0,
+                "password_reset_verified": False,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+
+    # Send password reset code email
+    result = await send_password_reset_code_email(normalized_email, reset_code)
     
     if not result['success']:
         raise HTTPException(
@@ -357,24 +373,75 @@ async def verify_reset_code(request: VerifyResetCodeRequest):
     """
     db = get_database()
     
+    normalized_email = request.email.lower().strip()
+
     # Check if user exists
-    user = await db.users.find_one({"email": request.email.lower()})
+    user = await db.users.find_one({"email": normalized_email})
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid email or code"
         )
-    
-    # Verify the code
-    result = verify_password_reset_code(request.email, request.code)
-    
-    if not result['valid']:
+
+    stored_code = user.get("password_reset_code")
+    expires_at = user.get("password_reset_expires_at")
+    attempts = user.get("password_reset_attempts", 0)
+    provided_code = request.code.strip()
+
+    if not stored_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result['message']
+            detail="No password reset code found. Please request a new code."
         )
-    
-    return {"verified": True, "message": result['message']}
+
+    if not expires_at or datetime.utcnow() > expires_at:
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$unset": {
+                "password_reset_code": "",
+                "password_reset_expires_at": "",
+                "password_reset_attempts": "",
+                "password_reset_verified": "",
+            }}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset code has expired. Please request a new code."
+        )
+
+    if attempts >= 5:
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$unset": {
+                "password_reset_code": "",
+                "password_reset_expires_at": "",
+                "password_reset_attempts": "",
+                "password_reset_verified": "",
+            }}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Too many failed attempts. Please request a new code."
+        )
+
+    if stored_code != provided_code:
+        next_attempts = attempts + 1
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"password_reset_attempts": next_attempts}}
+        )
+        remaining = max(0, 5 - next_attempts)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid code. {remaining} attempts remaining."
+        )
+
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password_reset_verified": True}}
+    )
+
+    return {"verified": True, "message": "Code verified successfully. You can now reset your password."}
 
 
 @router.post("/reset-password")
@@ -385,22 +452,69 @@ async def reset_password(request: ResetPasswordRequest):
     """
     db = get_database()
     
+    normalized_email = request.email.lower().strip()
+
     # Check if user exists
-    user = await db.users.find_one({"email": request.email.lower()})
+    user = await db.users.find_one({"email": normalized_email})
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid request"
         )
-    
-    # Verify the reset code is valid and was verified
-    if not is_reset_code_verified(request.email):
-        # If code wasn't verified, try to verify it now
-        result = verify_password_reset_code(request.email, request.code)
-        if not result['valid']:
+
+    stored_code = user.get("password_reset_code")
+    expires_at = user.get("password_reset_expires_at")
+    attempts = user.get("password_reset_attempts", 0)
+    verified = user.get("password_reset_verified", False)
+    provided_code = request.code.strip()
+
+    if not stored_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No password reset code found. Please request a new code."
+        )
+
+    if not expires_at or datetime.utcnow() > expires_at:
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$unset": {
+                "password_reset_code": "",
+                "password_reset_expires_at": "",
+                "password_reset_attempts": "",
+                "password_reset_verified": "",
+            }}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset code has expired. Please request a new code."
+        )
+
+    if not verified:
+        if attempts >= 5:
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$unset": {
+                    "password_reset_code": "",
+                    "password_reset_expires_at": "",
+                    "password_reset_attempts": "",
+                    "password_reset_verified": "",
+                }}
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result['message']
+                detail="Too many failed attempts. Please request a new code."
+            )
+
+        if stored_code != provided_code:
+            next_attempts = attempts + 1
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"password_reset_attempts": next_attempts}}
+            )
+            remaining = max(0, 5 - next_attempts)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid code. {remaining} attempts remaining."
             )
     
     # Update the password
@@ -412,11 +526,14 @@ async def reset_password(request: ResetPasswordRequest):
             "$set": {
                 "password_hash": new_password_hash,
                 "updated_at": datetime.utcnow()
+            },
+            "$unset": {
+                "password_reset_code": "",
+                "password_reset_expires_at": "",
+                "password_reset_attempts": "",
+                "password_reset_verified": "",
             }
         }
     )
-    
-    # Clear the reset code
-    clear_password_reset_code(request.email)
-    
+
     return {"success": True, "message": "Password has been reset successfully. You can now log in with your new password."}
