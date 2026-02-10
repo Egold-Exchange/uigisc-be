@@ -27,7 +27,7 @@ from app.schemas.page_content import (
 )
 from app.schemas.car_giveaway import CarGiveawaySubmissionResponse
 from app.middleware.auth import get_admin_user
-from app.schemas.user import TokenData
+from app.schemas.user import TokenData, AdminUserPasswordUpdate
 from app.models.opportunity import opportunity_helper
 from app.models.website import website_helper
 from app.models.car_giveaway import car_giveaway_submission_helper
@@ -36,6 +36,7 @@ from app.models.news_media import news_media_helper
 from app.models.event_highlight import event_category_helper, event_highlight_helper
 from app.models.page_content import page_content_helper, DEFAULT_CONTENT_MAP
 from app.services.storage import storage_service
+from app.services.auth import get_password_hash
 import uuid
 
 router = APIRouter()
@@ -1094,3 +1095,46 @@ async def update_page_content(
         updated_content = new_content
     
     return PageContentResponse(**page_content_helper(updated_content))
+
+
+# ==================== USER PASSWORD MANAGEMENT ====================
+
+@router.put("/users/{user_id}/password")
+async def update_user_password(
+    user_id: str,
+    payload: AdminUserPasswordUpdate,
+    current_user: TokenData = Depends(get_admin_user)
+):
+    """Admin-only: update a user's password and invalidate existing sessions."""
+    db = get_database()
+
+    try:
+        user_obj_id = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    user = await db.users.find_one({"_id": user_obj_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await db.users.update_one(
+        {"_id": user_obj_id},
+        {
+            "$set": {
+                "password_hash": get_password_hash(payload.new_password),
+                "updated_at": datetime.utcnow()
+            },
+            "$inc": {"token_version": 1},
+            "$unset": {
+                "password_reset_code": "",
+                "password_reset_expires_at": "",
+                "password_reset_attempts": "",
+                "password_reset_verified": "",
+            }
+        }
+    )
+
+    return {
+        "success": True,
+        "message": "Password updated successfully. Existing sessions were invalidated."
+    }

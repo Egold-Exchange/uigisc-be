@@ -65,6 +65,7 @@ async def register(user_data: UserCreate):
         "is_verified": True,  # Auto-verified as per request
         "verification_token": verification_token,
         "verification_token_expires": datetime.utcnow() + timedelta(hours=24),
+        "token_version": 0,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
     }
@@ -94,7 +95,8 @@ async def register(user_data: UserCreate):
         data={
             "sub": str(result.inserted_id),
             "email": user_data.email.lower(),
-            "role": role
+            "role": role,
+            "tv": 0
         }
     )
     
@@ -138,7 +140,8 @@ async def login(credentials: UserLogin):
         data={
             "sub": str(user["_id"]),
             "email": user["email"],
-            "role": user.get("role", "user")
+            "role": user.get("role", "user"),
+            "tv": int(user.get("token_version", 0))
         }
     )
     
@@ -526,6 +529,9 @@ async def reset_password(request: ResetPasswordRequest):
             "$set": {
                 "password_hash": new_password_hash,
                 "updated_at": datetime.utcnow()
+            },
+            "$inc": {
+                "token_version": 1
             },
             "$unset": {
                 "password_reset_code": "",

@@ -42,6 +42,7 @@ class TokenData(BaseModel):
     user_id: Optional[str] = None
     email: Optional[str] = None
     role: Optional[str] = None
+    token_version: int = 0
 
 
 class VerificationRequest(BaseModel):
@@ -92,4 +93,9 @@ class ResetPasswordRequest(BaseModel):
     """Schema for resetting password with verified code."""
     email: EmailStr
     code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8)
+
+
+class AdminUserPasswordUpdate(BaseModel):
+    """Schema for admin updating a user's password."""
     new_password: str = Field(..., min_length=8)

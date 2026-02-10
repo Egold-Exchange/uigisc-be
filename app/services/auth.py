@@ -45,12 +45,18 @@ def decode_access_token(token: str) -> Optional[TokenData]:
         user_id: str = payload.get("sub")
         email: str = payload.get("email")
         role: str = payload.get("role")
+        token_version = payload.get("tv", 0)
         
         if user_id is None:
             return None
         
-        return TokenData(user_id=user_id, email=email, role=role)
-    except JWTError:
+        return TokenData(
+            user_id=user_id,
+            email=email,
+            role=role,
+            token_version=int(token_version or 0)
+        )
+    except (JWTError, ValueError, TypeError):
         return None
 
 

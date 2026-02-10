@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
+from bson import ObjectId
 
 from app.services.auth import decode_access_token
 from app.schemas.user import TokenData
@@ -24,6 +25,25 @@ async def get_current_user(
     
     if token_data is None:
         raise credentials_exception
+
+    # Enforce token version check so password changes can invalidate old sessions.
+    try:
+        user_obj_id = ObjectId(token_data.user_id)
+    except Exception:
+        raise credentials_exception
+
+    db = get_database()
+    user = await db.users.find_one({"_id": user_obj_id})
+    if not user:
+        raise credentials_exception
+
+    current_token_version = int(user.get("token_version", 0))
+    if token_data.token_version != current_token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     return token_data
 
@@ -61,6 +81,23 @@ class OptionalAuth:
             return None
         
         token_data = decode_access_token(credentials.credentials)
+        if token_data is None:
+            return None
+
+        try:
+            user_obj_id = ObjectId(token_data.user_id)
+        except Exception:
+            return None
+
+        db = get_database()
+        user = await db.users.find_one({"_id": user_obj_id})
+        if not user:
+            return None
+
+        current_token_version = int(user.get("token_version", 0))
+        if token_data.token_version != current_token_version:
+            return None
+
         return token_data
 
 
