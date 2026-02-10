@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 
 from app.database import get_database
 from app.schemas.opportunity import OpportunityPublicResponse
@@ -21,6 +21,11 @@ from app.models.page_content import DEFAULT_CONTENT_MAP
 from app.models.car_giveaway import car_giveaway_submission_helper
 
 router = APIRouter()
+
+
+def _normalize_phone(phone: str) -> str:
+    """Normalize phone numbers for duplicate detection."""
+    return "".join(ch for ch in phone if ch.isdigit())
 
 
 @router.get("/opportunities", response_model=List[OpportunityPublicResponse])
@@ -84,11 +89,34 @@ async def submit_car_giveaway_form(form_data: CarGiveawaySubmissionCreate):
     """Store a public car giveaway form submission."""
     db = get_database()
 
+    email = form_data.email.lower().strip()
+    phone = form_data.phone.strip()
+    phone_normalized = _normalize_phone(phone)
+    if not phone_normalized:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid phone number"
+        )
+
+    existing = await db.car_giveaway_submissions.find_one({
+        "$or": [
+            {"email": email},
+            {"phone_normalized": phone_normalized},
+            {"phone": phone},
+        ]
+    })
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A submission already exists for this email or phone number"
+        )
+
     submission_doc = {
         "first_name": form_data.first_name.strip(),
         "last_name": form_data.last_name.strip(),
-        "phone": form_data.phone.strip(),
-        "email": form_data.email.lower().strip(),
+        "phone": phone,
+        "phone_normalized": phone_normalized,
+        "email": email,
         "agreed_to_rules": form_data.agreed_to_rules,
         "created_at": datetime.utcnow(),
     }
